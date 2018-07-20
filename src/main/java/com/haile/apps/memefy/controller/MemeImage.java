@@ -56,8 +56,16 @@ public class MemeImage {
 				System.out.println("originalImage: " + originalImage.getHeight() + "," + originalImage.getWidth());
 				BufferedImage image = null;
 				// resize image if larger than 600 x 600
-				if ((originalImage.getWidth() > 600) && (originalImage.getHeight() > 600)) {
-					image = resizeImage(originalImage, 600, 600, RenderingHints.VALUE_INTERPOLATION_BICUBIC, true);
+				if ((originalImage.getWidth() > 600) || (originalImage.getHeight() > 600)) {
+					if (originalImage.getWidth() > originalImage.getHeight()) {
+						int newWidth = 600;
+						int newHeight = (600/originalImage.getWidth())*originalImage.getHeight();
+						image = resizeImage(originalImage, newWidth, newHeight, RenderingHints.VALUE_INTERPOLATION_BICUBIC, true);
+					} else {
+						int newWidth = (600/originalImage.getHeight())*originalImage.getWidth();
+						int newHeight = 600;
+						image = resizeImage(originalImage, newWidth, newHeight, RenderingHints.VALUE_INTERPOLATION_BICUBIC, true);
+					}					
 				} else {
 					image = originalImage;
 				}
