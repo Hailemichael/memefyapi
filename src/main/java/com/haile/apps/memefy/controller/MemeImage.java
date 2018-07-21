@@ -59,10 +59,10 @@ public class MemeImage {
 				if ((originalImage.getWidth() > 600) || (originalImage.getHeight() > 600)) {
 					if (originalImage.getWidth() > originalImage.getHeight()) {
 						int newWidth = 600;
-						int newHeight = (600/originalImage.getWidth())*originalImage.getHeight();
+						int newHeight = (600*originalImage.getHeight())/originalImage.getWidth();
 						image = resizeImage(originalImage, newWidth, newHeight, RenderingHints.VALUE_INTERPOLATION_BICUBIC, true);
 					} else {
-						int newWidth = (600/originalImage.getHeight())*originalImage.getWidth();
+						int newWidth = (600*originalImage.getWidth())/originalImage.getHeight();
 						int newHeight = 600;
 						image = resizeImage(originalImage, newWidth, newHeight, RenderingHints.VALUE_INTERPOLATION_BICUBIC, true);
 					}					

@@ -23,7 +23,7 @@ public class MemefyController {
 			memeByte = memeImage.convertToMeme(meme.getImageUrl(), meme.getMemeText());
 			logger.debug("meme generated.");
 		} catch (Exception e) {
-			logger.error("Error occured while trying to generate meme" + e.getMessage(), e.getCause());
+			logger.error("Error occured while trying to generate meme: " + e.getMessage(), e.getCause());
 			return null;
 		}
 		return memeByte;
