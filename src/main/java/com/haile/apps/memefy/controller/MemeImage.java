@@ -2,6 +2,18 @@ package com.haile.apps.memefy.controller;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.tomcat.util.http.fileupload.IOUtils;
+import org.codehaus.jackson.jaxrs.JacksonJsonProvider;
+
+import com.sun.jersey.api.client.Client;
+import com.sun.jersey.api.client.ClientResponse;
+import com.sun.jersey.api.client.WebResource;
+import com.sun.jersey.api.client.config.ClientConfig;
+import com.sun.jersey.api.client.config.DefaultClientConfig;
+import com.sun.jersey.core.header.FormDataContentDisposition;
+import com.sun.jersey.multipart.FormDataMultiPart;
+import com.sun.jersey.multipart.MultiPart;
+import com.sun.jersey.multipart.file.FileDataBodyPart;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -11,19 +23,23 @@ import java.awt.RenderingHints;
 import java.awt.Transparency;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.HashMap;
 import java.util.Iterator;
 
 import javax.imageio.IIOException;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.spi.ImageReaderSpi;
+import javax.ws.rs.core.MediaType;
 
 public class MemeImage {
 	private static final Logger logger = LogManager.getLogger(MemeImage.class.getName());
@@ -34,13 +50,31 @@ public class MemeImage {
 		String suffix = null;
 		if (imageUrl != null && checkUrlValidity(imageUrl)) {
 			ByteArrayOutputStream bos = new ByteArrayOutputStream();
-			
+			BufferedImage originalImage = null;
 			try {
 				URL imgUrl = new URL(imageUrl);
+				originalImage = ImageIO.read(imgUrl);
+				if(originalImage == null) {
+					logger.error("The resource represented by the url: " + imageUrl + " is not an image.");
+					return null;
+				}
+				System.out.println("originalImage: " + originalImage.getHeight() + "," + originalImage.getWidth());
 				URLConnection conn = imgUrl.openConnection();
 				
-				String contentType = conn.getContentType();
+				// Get image extension from the first bytes
 
+//				conn.setConnectTimeout(5000);
+//		        conn.setReadTimeout(5000);
+//		        conn.connect();
+//				
+//				ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//		        IOUtils.copy(conn.getInputStream(), baos);
+//		        byte [] imageByteArray = baos.toByteArray();
+//		        System.out.println(imageByteArray);
+		        
+				String contentType = conn.getContentType();
+				
+				// Get image extension from content-type
 				Iterator<ImageReader> readers = ImageIO.getImageReadersByMIMEType(contentType);
 				while (suffix == null && readers.hasNext()) {
 					ImageReaderSpi provider = readers.next().getOriginatingProvider();
@@ -51,9 +85,12 @@ public class MemeImage {
 						}
 					}
 				}
-
-				final BufferedImage originalImage = ImageIO.read(imgUrl);
-				System.out.println("originalImage: " + originalImage.getHeight() + "," + originalImage.getWidth());
+				
+				if (suffix == null) {
+					logger.error("The resource represented by the url: " + imageUrl + " does not have valid image file extension.");
+					return null;
+				}				
+				
 				BufferedImage image = null;
 				// resize image if larger than 600 x 600
 				if ((originalImage.getWidth() > 600) || (originalImage.getHeight() > 600)) {
