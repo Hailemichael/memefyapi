@@ -54,7 +54,7 @@ public class MemefyController {
 			return new ResponseEntity<> (map, HttpStatus.INTERNAL_SERVER_ERROR);
 		}
 		
-		String filePath = System.getProperty("java.io.tmpdir");
+		String filePath = null;//System.getProperty("java.io.tmpdir");
 		
 		map = uploadToHabeshaitFTP(memeByte, filePath + originalFileName , "/memefied");
 		
