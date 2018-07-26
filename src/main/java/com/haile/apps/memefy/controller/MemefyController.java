@@ -8,8 +8,11 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.concurrent.CompletableFuture;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
@@ -22,6 +25,7 @@ import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -61,6 +65,9 @@ public class MemefyController {
 	@Value("${ftp.api.password}")
 	private String ftpApiPassword;
 	
+	@Autowired
+	private AsyncService asyncService;
+	
 	@RequestMapping(value="/memefy/file", method=RequestMethod.POST, headers = "content-type=multipart/form-data")
     public @ResponseBody ResponseEntity<?> ftpUpload(HttpServletRequest request, @RequestParam(value="file", required=true) MultipartFile file, @RequestParam(value="memeText", required=true) String memeText, @RequestParam(value="top", required=true) Boolean top) {
 		logger.info("Incomming request: " + request.getServletPath() + "_" + request.getRemoteAddr() + "_" + request.getRemoteUser());
@@ -98,14 +105,17 @@ public class MemefyController {
 		byte[] memeByte = null;
 		try {
 			memeByte = memeImage.convertToMeme(originalImage, suffix, memeText,top);
-			logger.debug("meme generated.");
-			map = uploadToHabeshaitFTP(memeByte, ftpApiUri, ftpApiUser, ftpApiPassword, fileName, "/memefied");
+			logger.debug("Meme generated, sending to ftp...");
+			String targetFileName = (new SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss.SSSZ")).format(new Date()) + "_" + fileName;
+			asyncService.uploadToHabeshaitFTP(memeByte, ftpApiUri, ftpApiUser, ftpApiPassword, targetFileName, "/memefied");
+			//Generate memefied image url while the file is being sent to ftp			
+			map.put("imageUrl", "http://habeshait.com/MemePics/memefied/" + targetFileName);
+			//map = uploadToHabeshaitFTP(memeByte, ftpApiUri, ftpApiUser, ftpApiPassword, fileName, "/memefied");
 		} catch (Exception e) {
 			logger.error(e.getMessage(), e.getCause());
 			map.put("error", e.getMessage());
 			return new ResponseEntity<> (map, HttpStatus.INTERNAL_SERVER_ERROR);
-		}
-		
+		}		
 		return new ResponseEntity<> (map, HttpStatus.OK);
     }
 	
@@ -180,8 +190,11 @@ public class MemefyController {
 		byte[] memeByte = null;
 		try {
 			memeByte = memeImage.convertToMeme(originalImage, suffix, newMeme.getMemeText(), newMeme.getTop());
-			logger.debug("meme generated.");
-			map = uploadToHabeshaitFTP(memeByte, ftpApiUri, ftpApiUser, ftpApiPassword, fileName + suffix , "/memefied");
+			logger.debug("Meme generated, sending to ftp...");
+			String targetFileName = (new SimpleDateFormat("yyyy-MM-dd'T'HH-mm-ss.SSSZ")).format(new Date()) + "_" + fileName + "." + suffix;
+			asyncService.uploadToHabeshaitFTP(memeByte, ftpApiUri, ftpApiUser, ftpApiPassword, targetFileName, "/memefied");
+			//Generate memefied image url while the file is being sent to ftp			
+			map.put("imageUrl", "http://habeshait.com/MemePics/memefied/" + targetFileName);
 		} catch (Exception e) {
 			logger.error(e.getMessage(), e.getCause());
 			map.put("error", e.getMessage());
