@@ -2,18 +2,7 @@ package com.haile.apps.memefy.controller;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.tomcat.util.http.fileupload.IOUtils;
-import org.codehaus.jackson.jaxrs.JacksonJsonProvider;
-
-import com.sun.jersey.api.client.Client;
-import com.sun.jersey.api.client.ClientResponse;
-import com.sun.jersey.api.client.WebResource;
-import com.sun.jersey.api.client.config.ClientConfig;
-import com.sun.jersey.api.client.config.DefaultClientConfig;
-import com.sun.jersey.core.header.FormDataContentDisposition;
-import com.sun.jersey.multipart.FormDataMultiPart;
-import com.sun.jersey.multipart.MultiPart;
-import com.sun.jersey.multipart.file.FileDataBodyPart;
+import org.apache.commons.io.IOUtils;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -21,207 +10,73 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.Transparency;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
-import java.net.ProtocolException;
 import java.net.URL;
-import java.net.URLConnection;
-import java.util.HashMap;
 import java.util.Iterator;
 
 import javax.imageio.IIOException;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.spi.ImageReaderSpi;
-import javax.ws.rs.core.MediaType;
 
 public class MemeImage {
 	private static final Logger logger = LogManager.getLogger(MemeImage.class.getName());
-	private static final boolean DEBUG = false;
+	private static final int MAX_FONT_SIZE = 472;
+    private static final int BOTTOM_MARGIN = 20;
+    private static final int TOP_MARGIN = 20;
+    private static final int SIDE_MARGIN = 20;
 
-	public byte[] convertToMeme(String imageUrl, String memeText) throws Exception {
-		String position = "bottom";
-		String suffix = null;
-		if (imageUrl != null && checkUrlValidity(imageUrl)) {
+	public byte[] convertToMeme(BufferedImage originalImage, String suffix, String memeText, boolean top) throws Exception {
+		
 			ByteArrayOutputStream bos = new ByteArrayOutputStream();
-			BufferedImage originalImage = null;
 			try {
-				URL imgUrl = new URL(imageUrl);
-				originalImage = ImageIO.read(imgUrl);
-				if(originalImage == null) {
-					logger.error("The resource represented by the url: " + imageUrl + " is not an image.");
-					return null;
-				}
-				System.out.println("originalImage: " + originalImage.getHeight() + "," + originalImage.getWidth());
-				URLConnection conn = imgUrl.openConnection();
-				
-				// Get image extension from the first bytes
-
-//				conn.setConnectTimeout(5000);
-//		        conn.setReadTimeout(5000);
-//		        conn.connect();
-//				
-//				ByteArrayOutputStream baos = new ByteArrayOutputStream();
-//		        IOUtils.copy(conn.getInputStream(), baos);
-//		        byte [] imageByteArray = baos.toByteArray();
-//		        System.out.println(imageByteArray);
-		        
-				String contentType = conn.getContentType();
-				
-				// Get image extension from content-type
-				Iterator<ImageReader> readers = ImageIO.getImageReadersByMIMEType(contentType);
-				while (suffix == null && readers.hasNext()) {
-					ImageReaderSpi provider = readers.next().getOriginatingProvider();
-					if (provider != null) {
-						String[] suffixes = provider.getFileSuffixes();
-						if (suffixes != null) {
-							suffix = suffixes[0];
-						}
-					}
-				}
-				
-				if (suffix == null) {
-					logger.error("The resource represented by the url: " + imageUrl + " does not have valid image file extension.");
-					return null;
-				}				
 				
 				BufferedImage image = null;
 				// resize image if larger than 600 x 600
 				if ((originalImage.getWidth() > 600) || (originalImage.getHeight() > 600)) {
 					if (originalImage.getWidth() > originalImage.getHeight()) {
 						int newWidth = 600;
-						int newHeight = (600*originalImage.getHeight())/originalImage.getWidth();
-						image = resizeImage(originalImage, newWidth, newHeight, RenderingHints.VALUE_INTERPOLATION_BICUBIC, true);
+						int newHeight = (600 * originalImage.getHeight()) / originalImage.getWidth();
+						image = resizeImage(originalImage, newWidth, newHeight,
+								RenderingHints.VALUE_INTERPOLATION_BICUBIC, true);
+						logger.debug("Image resize WxH: ", newWidth, newHeight);
 					} else {
-						int newWidth = (600*originalImage.getWidth())/originalImage.getHeight();
+						int newWidth = (600 * originalImage.getWidth()) / originalImage.getHeight();
 						int newHeight = 600;
-						image = resizeImage(originalImage, newWidth, newHeight, RenderingHints.VALUE_INTERPOLATION_BICUBIC, true);
-					}					
+						image = resizeImage(originalImage, newWidth, newHeight,
+								RenderingHints.VALUE_INTERPOLATION_BICUBIC, true);
+					}
 				} else {
 					image = originalImage;
 				}
 
 				// Add new line at the 3rd space occurrence
 				if (memeText != null) {
-					Font font = new Font("Utopia", Font.BOLD, 48);//Lucida Sans Typewriter
-					/**
-					 * Font style ================ 
-					 * 1. Bitstream Charter 
-					 * 2. Courier 10 Pitch 
-					 * 3. Cursor 
-					 * 4. DejaVu Sans 
-					 * 5. DejaVu Sans Condensed 
-					 * 6. DejaVu Sans Light 
-					 * 7. DejaVu Serif 
-					 * 8. DejaVu Serif Condensed 
-					 * 9. Dialog
-					 * 10. DialogInput 
-					 * 11. Lucida Bright 
-					 * 12. Lucida Sans 
-					 * 13. Lucida Sans Typewriter 
-					 * 14. Monospaced 
-					 * 15. SansSerif 
-					 * 16. Serif 
-					 * 17. Utopia
-					 */
 					Graphics g = image.getGraphics();
-					g.setFont(font);
-					System.out.println(
-							"Font used: \tName = " + g.getFont().getName() + "\tSize = " + g.getFont().getSize());
-					int textWithInPixel = g.getFontMetrics().stringWidth(memeText);
-
-					int tempLength = (int) (memeText.length() * ((500 / (double) textWithInPixel)));
-					System.out.println("tempLength int:  " + tempLength);
-					// setting yPosition according to length of text would be
-					// good....
-					int yPosition = 0;
-					if (position.equalsIgnoreCase("top")) {// position next
-															// version...
-						yPosition = 100;
-					} else {
-						yPosition = 400;
-					}
-					int xPosition = 50;
-					int border = 2;
-					if (tempLength < memeText.length()) {// needs to be printed in
-														// multiple lines
-						int line = 1;
-						while (tempLength < memeText.length()) {
-							String tempString = memeText.substring(0, tempLength);
-							String memeLine = tempString.substring(0, tempString.lastIndexOf(" "));
-							System.out.println("memeLine " + line + " = " + memeLine.trim());
-							drawBorder(g, memeLine.trim(), Color.WHITE, Color.BLACK, xPosition, yPosition, border);
-							memeText = memeText.substring(tempString.lastIndexOf(" "));
-							yPosition += 65;
-							line++;
-						}
-						System.out.println("memeLine " + line + " = " + memeText.trim());
-						drawBorder(g, memeText.trim(), Color.WHITE, Color.BLACK, xPosition, yPosition, border);
-					} else {// print in one line
-						// Add text to image
-						System.out.println("Single line meme = " + memeText.trim());
-						drawBorder(g, memeText.trim(), Color.WHITE, Color.BLACK, xPosition, yPosition, border);
-					}
+					drawStringCentered(g, memeText, image, top);
 					g.dispose();
 				}
-
+				
 				boolean imageGenerated = ImageIO.write(image, suffix, bos);
 				bos.flush();
 				System.out.println("imageGenerated:  " + imageGenerated);
+				return bos.toByteArray();
 
-			} catch (MalformedURLException e) {
-				throw new Exception("The image url is malformed, Url = " + imageUrl, e);
-			}	catch (FileNotFoundException e) {
-				throw new Exception("The image file is not found, Url = " + imageUrl, e);
-			} catch (IllegalArgumentException e) {
-				throw new Exception("Illegal argumen occured", e);
-			} catch (IIOException e) {
-				throw new Exception("Can't get input stream from URL: " + imageUrl, e);
-			} catch (IOException e) {
-				throw new Exception("IOException occured, Can't get input stream from URL!", e);
+			} catch (Exception e) {
+				throw new Exception("Exception occured while generating meme", e);
+			} finally {
+				bos.close();
 			}
-			return bos.toByteArray();
-		} else {
-			throw new Exception("Image url not found" + imageUrl);
-		}
 	}
-
-	private static void drawBorder(Graphics g, String text, Color mainColor, Color borderColor, int x, int y,
-			int times) {
-		g.setColor(borderColor);
-		for (int i = 0; i < times; i++) {
-			g.drawString(text, ShiftWest(x, i), ShiftNorth(y, i));
-			g.drawString(text, ShiftWest(x, i), ShiftSouth(y, i));
-			g.drawString(text, ShiftEast(x, i), ShiftNorth(y, i));
-			g.drawString(text, ShiftEast(x, i), ShiftSouth(y, i));
-		}
-		g.setColor(mainColor);
-		g.drawString(text, x, y);
-	}
-
-	static int ShiftNorth(int p, int distance) {
-		return (p - distance);
-	}
-
-	static int ShiftSouth(int p, int distance) {
-		return (p + distance);
-	}
-
-	static int ShiftEast(int p, int distance) {
-		return (p + distance);
-	}
-
-	static int ShiftWest(int p, int distance) {
-		return (p - distance);
-	}
-
-	public static BufferedImage resizeImage(BufferedImage img, int targetWidth, int targetHeight, Object hint,
+	
+	private static BufferedImage resizeImage(BufferedImage img, int targetWidth, int targetHeight, Object hint,
 			boolean higherQuality) {
 		int type = (img.getTransparency() == Transparency.OPAQUE) ? BufferedImage.TYPE_INT_RGB
 				: BufferedImage.TYPE_INT_ARGB;
@@ -267,23 +122,85 @@ public class MemeImage {
 		return ret;
 	}
 	
-	private static boolean checkUrlValidity(String url) throws MalformedURLException, ProtocolException, IOException {
-		boolean isValid = false;
-		URL pageUrl = null;
-		int responseCode = 0;
-		pageUrl = new URL(url);
-		HttpURLConnection huc = (HttpURLConnection) pageUrl.openConnection();
-		if (DEBUG)
-			logger.info("Making Http HEAD request to url: " + url);
-		huc.setRequestMethod("HEAD");
-		huc.connect();
-		responseCode = huc.getResponseCode();
-		if (DEBUG)
-			logger.info("Response code for Head request: " + responseCode);
-		if (responseCode == 200) {
-			isValid = true;
-		}
-		return isValid;
-	}
+	private static void drawStringCentered(Graphics g, String text, BufferedImage image, boolean top) throws InterruptedException {
+        if (text == null)
+            text = "";
+
+        int height = 0;
+        int fontSize = MAX_FONT_SIZE;
+        int maxCaptionHeight = image.getHeight() / 5;
+        int maxLineWidth = image.getWidth() - SIDE_MARGIN * 2;
+        String formattedString = "";
+
+        do {
+            g.setFont(new Font("Arial", Font.BOLD, fontSize));
+
+            // first inject newlines into the text to wrap properly
+            StringBuilder sb = new StringBuilder();
+            int left = 0;
+            int right = text.length() - 1;
+            while ( left < right ) {
+
+                String substring = text.substring(left, right + 1);
+                Rectangle2D stringBounds = g.getFontMetrics().getStringBounds(substring, g);
+                while ( stringBounds.getWidth() > maxLineWidth ) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw new InterruptedException();
+                    }
+
+                    // look for a space to break the line
+                    boolean spaceFound = false;
+                    for ( int i = right; i > left; i-- ) {
+                        if ( text.charAt(i) == ' ' ) {
+                            right = i - 1;
+                            spaceFound = true;
+                            break;
+                        }
+                    }
+                    substring = text.substring(left, right + 1);
+                    stringBounds = g.getFontMetrics().getStringBounds(substring, g);
+
+                    // If we're down to a single word and we are still too wide,
+                    // the font is just too big.
+                    if ( !spaceFound && stringBounds.getWidth() > maxLineWidth ) {
+                        break;
+                    }
+                }
+                sb.append(substring).append("\n");
+                left = right + 2;
+                right = text.length() - 1;
+            }
+
+            formattedString = sb.toString();
+
+            // now determine if this font size is too big for the allowed height
+            height = 0;
+            for ( String line : formattedString.split("\n") ) {
+                Rectangle2D stringBounds = g.getFontMetrics().getStringBounds(line, g);
+                height += stringBounds.getHeight();
+            }
+            fontSize--;
+        } while ( height > maxCaptionHeight );
+
+        // draw the string one line at a time
+        int y = 0;
+        if ( top ) {
+            y = TOP_MARGIN + g.getFontMetrics().getHeight();
+        } else {
+            y = image.getHeight() - height - BOTTOM_MARGIN + g.getFontMetrics().getHeight();
+        }
+        for ( String line : formattedString.split("\n") ) {        	
+            // Draw each string twice for a shadow effect
+            Rectangle2D stringBounds = g.getFontMetrics().getStringBounds(line, g);
+            int xPos = (image.getWidth() - (int) stringBounds.getWidth()) / 2;
+            g.setColor(Color.BLACK);
+            g.drawString(line, xPos + 1, y + 1);
+            g.setColor(Color.WHITE);
+            g.drawString(line, xPos, y);
+            y += g.getFontMetrics().getHeight();
+        }
+        g.dispose();
+    }
+
 
 }
