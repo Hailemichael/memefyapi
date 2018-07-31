@@ -156,7 +156,10 @@ public class MemefyController {
 				baos.close();
 				// Get content type from byte array
 				ByteArrayInputStream bis = new ByteArrayInputStream(imageByteArray);
-				contentType = HttpURLConnection.guessContentTypeFromStream(bis);					
+				contentType = HttpURLConnection.guessContentTypeFromStream(bis);
+				if (contentType == null) {
+					contentType = conn.getContentType();
+				}
 				// Read Buffered image from inputstream
 				originalImage = ImageIO.read(bis);
 				bis.close();
