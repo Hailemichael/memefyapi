@@ -2,7 +2,8 @@ package com.haile.apps.memefy.controller;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.commons.io.IOUtils;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -12,29 +13,23 @@ import java.awt.RenderingHints;
 import java.awt.Transparency;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.Iterator;
+import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
 
-import javax.imageio.IIOException;
 import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.spi.ImageReaderSpi;
 
+@Service
 public class MemeImage {
 	private static final Logger logger = LogManager.getLogger(MemeImage.class.getName());
 	private static final int MAX_FONT_SIZE = 472;
     private static final int BOTTOM_MARGIN = 20;
     private static final int TOP_MARGIN = 20;
     private static final int SIDE_MARGIN = 20;
-
-	public byte[] convertToMeme(BufferedImage originalImage, String suffix, String memeText, boolean top) throws Exception {
-		
+    
+    @Async("asyncServiceExecutor")
+	public CompletableFuture<byte[]> convertToMeme(BufferedImage originalImage, String suffix, String memeText, boolean top) throws Exception {
+			CompletableFuture<byte[]> futureMemeByte = new CompletableFuture<byte[]>();
 			ByteArrayOutputStream bos = new ByteArrayOutputStream();
 			try {
 				
@@ -66,8 +61,10 @@ public class MemeImage {
 				
 				boolean imageGenerated = ImageIO.write(image, suffix, bos);
 				bos.flush();
-				System.out.println("imageGenerated:  " + imageGenerated);
-				return bos.toByteArray();
+				logger.info("imageGenerated:  " + imageGenerated);
+				
+				futureMemeByte.complete(bos.toByteArray());
+				return futureMemeByte;
 
 			} catch (Exception e) {
 				throw new Exception("Exception occured while generating meme", e);

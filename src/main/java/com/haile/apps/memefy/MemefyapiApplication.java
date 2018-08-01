@@ -22,7 +22,7 @@ public class MemefyapiApplication {
         executor.setCorePoolSize(2);
         executor.setMaxPoolSize(2);
         executor.setQueueCapacity(500);
-        executor.setThreadNamePrefix("FTPUpload-");
+        executor.setThreadNamePrefix("MemeImage-");
         executor.initialize();
         return executor;
     }
